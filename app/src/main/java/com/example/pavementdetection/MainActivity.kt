@@ -1,4 +1,4 @@
-package com.example.collectdata
+package com.example.pavementdetection
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -95,6 +95,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var lastChannelBSaveMs = 0L
     private val CHANNEL_B_COOLDOWN_MS = 5000L
     private val isDetecting = AtomicBoolean(false)
+
+    // 设备唯一ID
+    private val deviceId: String by lazy {
+        android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ANDROID_ID
+        )
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // onCreate
@@ -387,6 +395,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             }
         }
+
+        // ── 上传到服务器 ──────────────────────────────────────────
+        val parts = gpsSnapshot.split(",")
+        val lat = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
+        val lng = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
+        val topDet = detections.firstOrNull()
+        if (topDet != null) {
+            val frames2 = eventDir.listFiles { f -> f.name.startsWith("frame_") }
+            val imageFile = frames2?.firstOrNull()
+            DetectionUploader.upload(
+                imageFile  = imageFile,
+                latitude   = lat,
+                longitude  = lng,
+                defectType = topDet.label,
+                confidence = topDet.confidence,
+                bboxX1     = topDet.boundingBox.left   / latestFrameWidth.toFloat(),
+                bboxY1     = topDet.boundingBox.top    / latestFrameHeight.toFloat(),
+                bboxX2     = topDet.boundingBox.right  / latestFrameWidth.toFloat(),
+                bboxY2     = topDet.boundingBox.bottom / latestFrameHeight.toFloat(),
+                channel    = "A",
+                deviceId   = deviceId,
+                onResult   = { success, msg ->
+                    Log.d("Upload_A", "通道A上传: $success - $msg")
+                }
+            )
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -424,6 +458,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 out.write("置信度: ${"%.2f".format(d.confidence)}\n")
                 out.write("---\n")
             }
+        }
+
+        // ── 上传到服务器 ──────────────────────────────────────────
+        val parts = gpsData.split(",")
+        val lat = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
+        val lng = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
+        val topDet = detections.firstOrNull()
+        if (topDet != null) {
+            val imageFile = File(eventDir, "frame_0.jpg")
+            DetectionUploader.upload(
+                imageFile  = imageFile,
+                latitude   = lat,
+                longitude  = lng,
+                defectType = topDet.label,
+                confidence = topDet.confidence,
+                bboxX1     = topDet.boundingBox.left / frame.width,
+                bboxY1     = topDet.boundingBox.top  / frame.height,
+                bboxX2     = topDet.boundingBox.right / frame.width,
+                bboxY2     = topDet.boundingBox.bottom / frame.height,
+                channel    = "B",
+                deviceId   = deviceId,
+                onResult   = { success, msg ->
+                    Log.d("Upload_B", "通道B上传: $success - $msg")
+                }
+            )
         }
     }
 

@@ -1,4 +1,4 @@
-# CollectData — 基于安卓APP的路面病害检测系统
+# 路面病害检测 — 基于安卓APP的路面病害检测系统
 
 > 大创项目。手机采集IMU + GPS + 视频，实时YOLO推理检测路面病害，双通道触发保存事件数据。
 
@@ -237,7 +237,7 @@ interpreter = Interpreter(modelBuffer, Interpreter.Options().apply {
 ## 数据保存结构
 
 ```
-/sdcard/Android/data/com.example.collectdata/files/RoadDataCapture/
+/sdcard/Android/data/pavementdetectionapp/files/RoadDataCapture/
 ├── Video_20260424_085400.mp4       # 录像文件
 ├── IMU_20260424_085400.txt         # 全程IMU数据（AccX,AccY,AccZ,GyroX,GyroY,GyroZ）
 ├── GPS_20260424_085400.txt         # 全程GPS轨迹（Latitude,Longitude）

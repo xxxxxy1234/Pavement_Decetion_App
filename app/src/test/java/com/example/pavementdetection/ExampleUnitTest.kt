@@ -1,4 +1,4 @@
-package com.example.collectdata
+package com.example.pavementdetection
 
 import org.junit.Test
 

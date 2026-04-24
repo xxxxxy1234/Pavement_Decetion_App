@@ -2,7 +2,6 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 
-package="com.example.collectdata"
 
 xmlns:tools="http://schemas.android.com/tools">
 
@@ -24,14 +23,17 @@ xmlns:tools="http://schemas.android.com/tools">
 
 <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
-
+   <!--    添加网络权限-->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
 <uses-feature android:name="android.hardware.camera" android:required="false" />
 
 
-
 <application
 
+
+    android:usesCleartextTraffic="true"
 
 
     android:requestLegacyExternalStorage="true"
@@ -50,11 +52,11 @@ xmlns:tools="http://schemas.android.com/tools">
 
     android:supportsRtl="true"
 
-    android:theme="@style/Theme.CollectData">
+    android:theme="@style/Theme.pavementdetection">
 
     <activity
 
-        android:name=".MainActivity"
+        android:name="com.example.pavementdetection.MainActivity"
 
         android:exported="true">
 
@@ -70,7 +72,7 @@ xmlns:tools="http://schemas.android.com/tools">
 
     </activity>
 
-    <activity android:name=".SettingsActivity" />
+    <activity android:name="com.example.pavementdetection.SettingsActivity" />
 
 </application>
 

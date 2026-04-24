@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CollectData"
+rootProject.name = "pavement_detection_app"
 include(":app")

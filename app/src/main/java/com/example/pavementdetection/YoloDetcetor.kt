@@ -1,4 +1,4 @@
-package com.example.collectdata
+package com.example.pavementdetection
 
 import android.content.Context
 import android.graphics.Bitmap

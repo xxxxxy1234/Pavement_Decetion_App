@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.collectdata"
+    namespace = "com.example.pavementdetection"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.collectdata"
+        applicationId = "com.example.pavementdetection"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -66,4 +66,8 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0") // 可选，GPU加速
+
+    // 添加网络依赖，HTTP上传
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
 }
