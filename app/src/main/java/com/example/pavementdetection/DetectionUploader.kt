@@ -14,7 +14,7 @@ object DetectionUploader {
 
     // ⚠改成你电脑的局域网IP，手机和电脑需在同一WiFi
 
-    private const val SERVER_URL = "http://192.168.5.3:8080/api/detection/upload"
+    private const val SERVER_URL = "http://192.168.5.77:8080/api/detection/upload"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)

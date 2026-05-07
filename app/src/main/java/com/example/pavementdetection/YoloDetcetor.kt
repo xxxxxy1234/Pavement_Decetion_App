@@ -35,11 +35,14 @@ class YoloDetector(
     // 【优化】输出数组复用
     private val outputArray = Array(1) { Array(300) { FloatArray(6) } }
 
+
+
     init {
         loadModel()
         loadLabels()
         Log.d("YOLO_INIT", "加载了 ${labels.size} 个类别: $labels")
     }
+
 
     private fun loadModel() {
         val assetFd = context.assets.openFd(modelPath)
@@ -51,9 +54,19 @@ class YoloDetector(
         )
         inputStream.close()
         assetFd.close()
-        interpreter = Interpreter(modelBuffer, Interpreter.Options().apply {
-            numThreads = 4
-        })
+
+        val options = Interpreter.Options()
+        try {
+            val nnApiDelegate = org.tensorflow.lite.nnapi.NnApiDelegate()
+            options.addDelegate(nnApiDelegate)
+            options.numThreads = 1
+            Log.d("YOLO_INIT", "NNAPI Delegate 启用")
+        } catch (e: Throwable) {
+            Log.w("YOLO_INIT", "NNAPI不可用，回退CPU: ${e.message}")
+            options.numThreads = 4
+        }
+
+        interpreter = Interpreter(modelBuffer, options)
     }
 
     private fun loadLabels() {
@@ -87,10 +100,14 @@ class YoloDetector(
             interpreter?.runForMultipleInputsOutputs(arrayOf(inputBuffer), outputMap)
             val t3 = System.currentTimeMillis()
 
-            val result = parseOutput(outputArray[0], bitmap.width.toFloat(), bitmap.height.toFloat())
+            val result =
+                parseOutput(outputArray[0], bitmap.width.toFloat(), bitmap.height.toFloat())
             val t4 = System.currentTimeMillis()
 
-            Log.d("YOLO_PERF", "缩放=${t1-t0}ms 预处理=${t2-t1}ms 推理=${t3-t2}ms 解析=${t4-t3}ms 总=${t4-t0}ms")
+            Log.d(
+                "YOLO_PERF",
+                "缩放=${t1 - t0}ms 预处理=${t2 - t1}ms 推理=${t3 - t2}ms 解析=${t4 - t3}ms 总=${t4 - t0}ms"
+            )
 
             result
         }
@@ -102,8 +119,8 @@ class YoloDetector(
         bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
         for (pixel in pixels) {
             inputBuffer.putFloat(((pixel shr 16) and 0xFF) / 255.0f)  // R
-            inputBuffer.putFloat(((pixel shr 8)  and 0xFF) / 255.0f)  // G
-            inputBuffer.putFloat(( pixel          and 0xFF) / 255.0f)  // B
+            inputBuffer.putFloat(((pixel shr 8) and 0xFF) / 255.0f)  // G
+            inputBuffer.putFloat((pixel and 0xFF) / 255.0f)  // B
         }
         // 【重要】推理前 rewind，让 TFLite 从头读取
         inputBuffer.rewind()
@@ -117,7 +134,10 @@ class YoloDetector(
         // 诊断日志：打印置信度最高的3行（确认模型输出正常后可删除）
         val top3 = output.sortedByDescending { it[4] }.take(3)
         top3.forEachIndexed { i, row ->
-            Log.d("YOLO_RAW", "top[$i]: x1=${row[0]} y1=${row[1]} x2=${row[2]} y2=${row[3]} conf=${row[4]} cls=${row[5]}")
+            Log.d(
+                "YOLO_RAW",
+                "top[$i]: x1=${row[0]} y1=${row[1]} x2=${row[2]} y2=${row[3]} conf=${row[4]} cls=${row[5]}"
+            )
         }
 
         val results = mutableListOf<DetectionResult>()
@@ -138,7 +158,7 @@ class YoloDetector(
 
             results.add(
                 DetectionResult(
-                    label      = labels.getOrElse(cls) { "cls_$cls" },
+                    label = labels.getOrElse(cls) { "cls_$cls" },
                     confidence = conf,
                     boundingBox = RectF(x1, y1, x2, y2)
                 )
