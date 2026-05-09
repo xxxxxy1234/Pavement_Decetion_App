@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // ── CameraX ───────────────────────────────────────────────────────────────
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
-    // 帧缓冲保留60帧（约2秒@30fps），供通道A取前2秒画面
+    // 帧缓冲保留30帧（约1秒@30fps），供通道A取前2秒画面
     private val frameBuffer = Collections.synchronizedList(mutableListOf<Bitmap>())
 
     // ── 最新帧（用于推理完成后叠加到当前预览） ──────────────────────────────
@@ -132,6 +132,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         btnRecord.setOnClickListener { captureVideo() }
+
 
         tvStatus.setOnClickListener {
             val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -225,7 +226,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 // 存入帧缓冲
                 val safeCopy = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
                 frameBuffer.add(safeCopy)
-                if (frameBuffer.size > 60) frameBuffer.removeAt(0)
+                if (frameBuffer.size > 30) frameBuffer.removeAt(0)
 
                 // ── 通道B：录制中实时推理 ──────────────────────────────────
                 val now = System.currentTimeMillis()

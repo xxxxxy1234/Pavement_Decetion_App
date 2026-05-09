@@ -78,4 +78,12 @@ dependencies {
     // 添加网络依赖，HTTP上传
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    //地图
+    implementation("com.amap.api:3dmap:9.8.2")
+
+    //RecyclerView 依赖
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.cardview:cardview:1.0.0")
+
+
 }
