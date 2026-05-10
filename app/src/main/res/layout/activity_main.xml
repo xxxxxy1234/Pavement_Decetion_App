@@ -8,73 +8,175 @@
     android:background="#000000"
     tools:context=".MainActivity">
 
+    <!-- 相机预览，占满全屏 -->
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- 检测框叠加层 -->
     <com.example.pavementdetection.DetectionOverlayView
         android:id="@+id/overlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- 顶部信息栏 -->
     <LinearLayout
         android:id="@+id/infoPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#80000000"
+        android:background="#CC000000"
         android:orientation="vertical"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <!-- 第一行：返回按钮 + 标题 -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="视频IMU采集"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
+            <ImageButton
+                android:id="@+id/btnBackHome"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@null"
+                android:contentDescription="返回首页"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="路面采集中"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- 录制状态指示点 -->
+            <TextView
+                android:id="@+id/tvRecordDot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● 待机"
+                android:textColor="#888888"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 第二行：参数配置 -->
         <TextView
             android:id="@+id/tvConfig"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="阈值: 3.0 m/s² | 采样率: 60Hz"
-            android:textColor="#CCCCCC"
-            android:textSize="12sp" />
+            android:text="阈值: 3.0 m/s² | 采样率: 50Hz"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp"
+            android:layout_marginBottom="4dp" />
 
+        <!-- 第三行：实时加速度 -->
         <TextView
             android:id="@+id/tvAccTal"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="实时 acc_tal: 0.00"
+            android:text="acc_tal: 0.00 m/s²"
             android:textColor="#FF4444"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="2dp" />
 
+        <!-- 第四行：GPS状态（原tvStatus，点击手动获取位置） -->
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="状态: 正常监测中..."
-            android:textColor="#00FF00"
-            android:textSize="14sp" />
+            android:text="GPS: 等待定位..."
+            android:textColor="#00CC66"
+            android:textSize="11sp" />
+
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnRecord"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_marginBottom="32dp"
-        android:background="@drawable/ic_launcher_background"
-        android:text="录制"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+    <!-- 底部录制控制区 -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#CC000000"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:paddingBottom="32dp"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        app:layout_constraintBottom_toBottomOf="parent">
 
+        <!-- 录制按钮（圆形，居中） -->
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp">
 
+            <!-- 外圈白环 -->
+            <View
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/ic_launcher_background"
+                android:alpha="0.3" />
+
+            <!-- 录制按钮本体 -->
+            <Button
+                android:id="@+id/btnRecord"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ic_launcher_background"
+                android:text=""
+                android:backgroundTint="#FF3B30" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- 录制时长显示（录制中才显示，默认隐藏） -->
+    <TextView
+        android:id="@+id/tvDuration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:background="#88000000"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="00:00"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 检测结果浮层（底部，录制中显示最新检测到的病害） -->
+    <TextView
+        android:id="@+id/tvDetectionHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:layout_marginEnd="16dp"
+        android:background="#AA000000"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text=""
+        android:textColor="#FF9500"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

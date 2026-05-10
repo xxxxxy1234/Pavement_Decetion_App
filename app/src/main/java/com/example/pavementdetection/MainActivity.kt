@@ -134,6 +134,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         btnRecord.setOnClickListener { captureVideo() }
 
 
+        // 返回首页
+        findViewById<android.widget.ImageButton>(R.id.btnBackHome).setOnClickListener {
+            finish()
+        }
+
+        // 点击GPS行手动刷新位置
         tvStatus.setOnClickListener {
             val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
             try {
@@ -141,17 +147,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 if (best != null) {
                     lastLocationText = "${best.latitude},${best.longitude}"
-                    tvStatus.text = "手动获取成功: $lastLocationText"
+                    tvStatus.text = "GPS: ${best.latitude.toBigDecimal().setScale(5, java.math.RoundingMode.HALF_UP)}, ${best.longitude.toBigDecimal().setScale(5, java.math.RoundingMode.HALF_UP)}"
                 } else {
-                    tvStatus.text = "缓存为空，请去室外"
+                    tvStatus.text = "GPS: 缓存为空，请去室外"
                 }
             } catch (e: SecurityException) {
-                tvStatus.text = "权限被拒绝"
+                tvStatus.text = "GPS: 权限被拒绝"
             }
-        }
-
-        infoPanel.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 
@@ -163,6 +165,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 lastLocationText = "${location.latitude},${location.longitude}"
+                runOnUiThread {
+                    tvStatus.text = "GPS: ${"%.5f".format(location.latitude)}, ${"%.5f".format(location.longitude)}"
+                }
                 if (isRecording) {
                     try {
                         currentFileGpsWriter?.write("$lastLocationText\n")
@@ -315,8 +320,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         imuFileWriter?.write("AccX,AccY,AccZ,GyroX,GyroY,GyroZ\n")
                         currentFileGpsWriter = File(roadDir, "GPS_$ts.txt").bufferedWriter()
                         currentFileGpsWriter?.write("Latitude,Longitude\n")
-                        btnRecord.text = "停止"
+                        btnRecord.text = ""
                         isRecording    = true
+                        btnRecord.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                            android.graphics.Color.parseColor("#FF3B30"))
+                        runOnUiThread {
+                            findViewById<TextView>(R.id.tvRecordDot).text = "● 录制中"
+                            findViewById<TextView>(R.id.tvRecordDot).setTextColor(getColor(android.R.color.holo_red_light))
+                        }
                     }
                     is VideoRecordEvent.Finalize -> {
                         try {
@@ -327,13 +338,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         }
                         imuFileWriter        = null
                         currentFileGpsWriter = null
-                        btnRecord.text       = "录制"
+                        btnRecord.text       = ""
                         isRecording          = false
+                        btnRecord.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                            android.graphics.Color.parseColor("#555555"))
 
                         runOnUiThread {
-                            overlayView.detections = emptyList()
-                            overlayView.invalidate()
+                            findViewById<TextView>(R.id.tvRecordDot).text = "● 待机"
+                            findViewById<TextView>(R.id.tvRecordDot).setTextColor(android.graphics.Color.parseColor("#888888"))
                         }
+
 
                         if (!recordEvent.hasError()) {
                             Toast.makeText(baseContext, "视频与数据已统一保存", Toast.LENGTH_SHORT).show()
