@@ -1,6 +1,5 @@
-package com.example.pavementdetection
+package com.example.pavementdetection.map
 
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -13,6 +12,7 @@ import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.MapView
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.maps.model.*
+import com.example.pavementdetection.R
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*

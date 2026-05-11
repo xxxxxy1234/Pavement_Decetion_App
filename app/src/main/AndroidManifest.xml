@@ -30,9 +30,9 @@
             android:name="com.amap.api.v2.apikey"
             android:value="0e1c6433b6d6eae88655d076935da44e" />
 
-        <!-- 启动页改为 HomeActivity -->
+        <!-- 把原来 HomeActivity 的 intent-filter 移到 LoginActivity -->
         <activity
-            android:name="com.example.pavementdetection.HomeActivity"
+            android:name=".auth.LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -40,13 +40,19 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="com.example.pavementdetection.MainActivity" />
-        <activity android:name="com.example.pavementdetection.SettingsActivity" />
+        <activity android:name=".auth.RegisterActivity" />
+
+        <!-- HomeActivity 去掉 intent-filter，保留 activity 声明即可 -->
+        <activity android:name=".home.HomeActivity" />
+
+        <activity android:name="com.example.pavementdetection.detection.MainActivity" />
+        <activity android:name="com.example.pavementdetection.settings.SettingsActivity" />
         <activity
-            android:name="com.example.pavementdetection.MapActivity"
+            android:name="com.example.pavementdetection.map.MapActivity"
             android:process=":map" />
-        <activity android:name="com.example.pavementdetection.HistoryActivity" />
-        <activity android:name="com.example.pavementdetection.EventDetailActivity" />
+        <activity android:name="com.example.pavementdetection.history.HistoryActivity" />
+        <activity android:name="com.example.pavementdetection.history.EventDetailActivity" />
+        <activity android:name=".profile.ProfileActivity" />
 
     </application>
 

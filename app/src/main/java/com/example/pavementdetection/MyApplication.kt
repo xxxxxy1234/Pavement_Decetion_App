@@ -2,6 +2,8 @@ package com.example.pavementdetection
 
 import android.app.Application
 import com.amap.api.maps.MapsInitializer
+import com.example.pavementdetection.auth.TokenManager
+import com.example.pavementdetection.upload.DetectionUploader
 
 class MyApplication : Application() {
     override fun onCreate() {
@@ -10,5 +12,7 @@ class MyApplication : Application() {
         MapsInitializer.updatePrivacyShow(this, true, true)
         MapsInitializer.updatePrivacyAgree(this, true)
         MapsInitializer.initialize(this)
+        TokenManager.init(this)
+        DetectionUploader.init(this)
     }
 }

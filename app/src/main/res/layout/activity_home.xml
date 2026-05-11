@@ -77,7 +77,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <!-- 总事件数 -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -102,13 +101,11 @@
                             android:textSize="11sp" />
                     </LinearLayout>
 
-                    <!-- 分割线 -->
                     <View
                         android:layout_width="1dp"
                         android:layout_height="48dp"
                         android:background="#333333" />
 
-                    <!-- IMU触发 -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -133,13 +130,11 @@
                             android:textSize="11sp" />
                     </LinearLayout>
 
-                    <!-- 分割线 -->
                     <View
                         android:layout_width="1dp"
                         android:layout_height="48dp"
                         android:background="#333333" />
 
-                    <!-- 视觉触发 -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -167,7 +162,7 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 开始采集按钮（主操作） -->
+        <!-- 开始采集按钮 -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardCapture"
             android:layout_width="match_parent"
@@ -319,6 +314,32 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="记录"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- 我的 -->
+        <LinearLayout
+            android:id="@+id/navProfile"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚇"
+                android:textColor="#888888"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="我的"
                 android:textColor="#888888"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />

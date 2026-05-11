@@ -1,4 +1,4 @@
-package com.example.pavementdetection  // 改成你APP的包名
+package com.example.pavementdetection.upload  // 改成你APP的包名
 
 import android.util.Log
 import okhttp3.*
@@ -7,6 +7,8 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import android.content.Context
+import com.example.pavementdetection.auth.AuthInterceptor
 
 object DetectionUploader {
 
@@ -14,14 +16,18 @@ object DetectionUploader {
 
     // ⚠改成你电脑的局域网IP，手机和电脑需在同一WiFi
 
-    private const val SERVER_URL = "http://192.168.5.77:8080/api/detection/upload"
+    private const val SERVER_URL = "http://172.20.10.11:8080/api/detection/upload"
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private lateinit var client: OkHttpClient
 
+    fun init(context: Context) {
+        client = OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(context))   // ← 加这行
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
     /**
      * 上传一条检测记录
      * @param imageFile 检测帧图片文件（可为null）

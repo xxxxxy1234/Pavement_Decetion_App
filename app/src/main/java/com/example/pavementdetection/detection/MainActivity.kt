@@ -1,9 +1,8 @@
-package com.example.pavementdetection
+package com.example.pavementdetection.detection
 
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.Sensor
@@ -25,6 +24,8 @@ import androidx.camera.video.*
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.pavementdetection.upload.DetectionUploader
+import com.example.pavementdetection.R
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -420,18 +421,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val frames2 = eventDir.listFiles { f -> f.name.startsWith("frame_") }
             val imageFile = frames2?.firstOrNull()
             DetectionUploader.upload(
-                imageFile  = imageFile,
-                latitude   = lat,
-                longitude  = lng,
+                imageFile = imageFile,
+                latitude = lat,
+                longitude = lng,
                 defectType = topDet.label,
                 confidence = topDet.confidence,
-                bboxX1     = topDet.boundingBox.left   / latestFrameWidth.toFloat(),
-                bboxY1     = topDet.boundingBox.top    / latestFrameHeight.toFloat(),
-                bboxX2     = topDet.boundingBox.right  / latestFrameWidth.toFloat(),
-                bboxY2     = topDet.boundingBox.bottom / latestFrameHeight.toFloat(),
-                channel    = "A",
-                deviceId   = deviceId,
-                onResult   = { success, msg ->
+                bboxX1 = topDet.boundingBox.left / latestFrameWidth.toFloat(),
+                bboxY1 = topDet.boundingBox.top / latestFrameHeight.toFloat(),
+                bboxX2 = topDet.boundingBox.right / latestFrameWidth.toFloat(),
+                bboxY2 = topDet.boundingBox.bottom / latestFrameHeight.toFloat(),
+                channel = "A",
+                deviceId = deviceId,
+                onResult = { success, msg ->
                     Log.d("Upload_A", "通道A上传: $success - $msg")
                 }
             )
@@ -483,18 +484,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (topDet != null) {
             val imageFile = File(eventDir, "frame_0.jpg")
             DetectionUploader.upload(
-                imageFile  = imageFile,
-                latitude   = lat,
-                longitude  = lng,
+                imageFile = imageFile,
+                latitude = lat,
+                longitude = lng,
                 defectType = topDet.label,
                 confidence = topDet.confidence,
-                bboxX1     = topDet.boundingBox.left / frame.width,
-                bboxY1     = topDet.boundingBox.top  / frame.height,
-                bboxX2     = topDet.boundingBox.right / frame.width,
-                bboxY2     = topDet.boundingBox.bottom / frame.height,
-                channel    = "B",
-                deviceId   = deviceId,
-                onResult   = { success, msg ->
+                bboxX1 = topDet.boundingBox.left / frame.width,
+                bboxY1 = topDet.boundingBox.top / frame.height,
+                bboxX2 = topDet.boundingBox.right / frame.width,
+                bboxY2 = topDet.boundingBox.bottom / frame.height,
+                channel = "B",
+                deviceId = deviceId,
+                onResult = { success, msg ->
                     Log.d("Upload_B", "通道B上传: $success - $msg")
                 }
             )

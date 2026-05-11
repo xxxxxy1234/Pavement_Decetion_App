@@ -1,4 +1,4 @@
-package com.example.pavementdetection
+package com.example.pavementdetection.detection
 
 import android.content.Context
 import android.graphics.Bitmap

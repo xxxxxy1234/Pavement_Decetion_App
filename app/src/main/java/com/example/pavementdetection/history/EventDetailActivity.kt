@@ -1,10 +1,9 @@
-package com.example.pavementdetection
+package com.example.pavementdetection.history
 
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -12,6 +11,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.example.pavementdetection.R
+import com.example.pavementdetection.map.MapActivity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*

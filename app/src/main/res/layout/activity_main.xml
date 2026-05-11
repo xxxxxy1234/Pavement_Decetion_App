@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000"
-    tools:context=".MainActivity">
+    tools:context=".detection.MainActivity">
 
     <!-- 相机预览，占满全屏 -->
     <androidx.camera.view.PreviewView
@@ -15,7 +15,7 @@
         android:layout_height="match_parent" />
 
     <!-- 检测框叠加层 -->
-    <com.example.pavementdetection.DetectionOverlayView
+    <com.example.pavementdetection.detection.DetectionOverlayView
         android:id="@+id/overlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

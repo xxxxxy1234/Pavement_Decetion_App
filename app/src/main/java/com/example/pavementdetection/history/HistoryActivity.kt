@@ -1,4 +1,4 @@
-package com.example.pavementdetection
+package com.example.pavementdetection.history
 
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.pavementdetection.R
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
