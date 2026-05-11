@@ -13,6 +13,8 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
@@ -51,6 +53,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var tvStatus: TextView
     private lateinit var btnRecord: Button
     private lateinit var overlayView: DetectionOverlayView
+    private lateinit var tvRecordDot: TextView
+    private lateinit var tvDuration: TextView
+    private lateinit var tvInferMs: TextView
+    private lateinit var tvImuState: TextView
+    private lateinit var tvSessionCount: TextView
+    private lateinit var tvChannelA: TextView
+    private lateinit var tvChannelB: TextView
+    private lateinit var tvRecordHint: TextView
+
+    // ── 计时器 ────────────────────────────────────────────────────────────────
+    private val timerHandler = Handler(Looper.getMainLooper())
+    private var recordingStartMs = 0L
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            if (isRecording) {
+                val elapsed = (System.currentTimeMillis() - recordingStartMs) / 1000
+                val min = elapsed / 60
+                val sec = elapsed % 60
+                tvDuration.text = "%02d:%02d".format(min, sec)
+                timerHandler.postDelayed(this, 1000)
+            }
+        }
+    }
+
+    // ── 本次采集统计 ──────────────────────────────────────────────────────────
+    private var sessionEventCount = 0
 
     // ── 传感器 ────────────────────────────────────────────────────────────────
     private lateinit var sensorManager: SensorManager
@@ -73,11 +101,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // ── CameraX ───────────────────────────────────────────────────────────────
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
-    // 帧缓冲保留30帧（约1秒@30fps），供通道A取前2秒画面
     private val frameBuffer = Collections.synchronizedList(mutableListOf<Bitmap>())
 
-    // ── 最新帧（用于推理完成后叠加到当前预览） ──────────────────────────────
-    // 用 volatile 保证线程可见性，始终持有最新一帧的尺寸
     @Volatile private var latestFrameWidth = 1
     @Volatile private var latestFrameHeight = 1
 
@@ -89,19 +114,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     // ── YOLO ──────────────────────────────────────────────────────────────────
     private lateinit var detector: YoloDetector
-
-    // 通道B（实时视频流检测）参数
     private var lastRealtimeDetectMs = 0L
-    private val REALTIME_INTERVAL_MS = 200L   // 【修改】500ms → 200ms，响应更快
+    private val REALTIME_INTERVAL_MS = 200L
     private var lastChannelBSaveMs = 0L
     private val CHANNEL_B_COOLDOWN_MS = 5000L
     private val isDetecting = AtomicBoolean(false)
 
-    // 设备唯一ID
+    // ── 设备ID ────────────────────────────────────────────────────────────────
     private val deviceId: String by lazy {
         android.provider.Settings.Secure.getString(
-            contentResolver,
-            android.provider.Settings.Secure.ANDROID_ID
+            contentResolver, android.provider.Settings.Secure.ANDROID_ID
         )
     }
 
@@ -112,12 +134,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvAccTal    = findViewById(R.id.tvAccTal)
-        tvStatus    = findViewById(R.id.tvStatus)
-        btnRecord   = findViewById(R.id.btnRecord)
-        overlayView = findViewById(R.id.overlayView)
-
-        val infoPanel = findViewById<android.widget.LinearLayout>(R.id.infoPanel)
+        tvAccTal        = findViewById(R.id.tvAccTal)
+        tvStatus        = findViewById(R.id.tvStatus)
+        btnRecord       = findViewById(R.id.btnRecord)
+        overlayView     = findViewById(R.id.overlayView)
+        tvRecordDot     = findViewById(R.id.tvRecordDot)
+        tvDuration      = findViewById(R.id.tvDuration)
+        tvInferMs       = findViewById(R.id.tvInferMs)
+        tvImuState      = findViewById(R.id.tvImuState)
+        tvSessionCount  = findViewById(R.id.tvSessionCount)
+        tvChannelA      = findViewById(R.id.tvChannelA)
+        tvChannelB      = findViewById(R.id.tvChannelB)
+        tvRecordHint    = findViewById(R.id.tvRecordHint)
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelSensor   = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -134,13 +162,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         btnRecord.setOnClickListener { captureVideo() }
 
-
-        // 返回首页
         findViewById<android.widget.ImageButton>(R.id.btnBackHome).setOnClickListener {
             finish()
         }
 
-        // 点击GPS行手动刷新位置
         tvStatus.setOnClickListener {
             val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
             try {
@@ -148,7 +173,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 if (best != null) {
                     lastLocationText = "${best.latitude},${best.longitude}"
-                    tvStatus.text = "GPS: ${best.latitude.toBigDecimal().setScale(5, java.math.RoundingMode.HALF_UP)}, ${best.longitude.toBigDecimal().setScale(5, java.math.RoundingMode.HALF_UP)}"
+                    tvStatus.text = "GPS: ${"%.5f".format(best.latitude)}, ${"%.5f".format(best.longitude)}"
                 } else {
                     tvStatus.text = "GPS: 缓存为空，请去室外"
                 }
@@ -217,19 +242,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 .build()
 
             imageAnalyzer.setAnalyzer(ContextCompat.getMainExecutor(this)) { imageProxy ->
-                // 【修改】toRotatedBitmap() 放到 close() 之前，旋转后宽高才是正确的
                 val bitmap = imageProxy.toRotatedBitmap()
                 imageProxy.close()
 
-                // 【修改】旋转后宽高已互换，用 bitmap.width/height 而不是 imageProxy.width/height
                 val w = bitmap.width
                 val h = bitmap.height
-
-                // 始终更新最新帧尺寸，供推理完成后的UI更新使用
                 latestFrameWidth  = w
                 latestFrameHeight = h
 
-                // 存入帧缓冲
                 val safeCopy = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
                 frameBuffer.add(safeCopy)
                 if (frameBuffer.size > 30) frameBuffer.removeAt(0)
@@ -240,14 +260,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     && isDetecting.compareAndSet(false, true)) {
 
                     lastRealtimeDetectMs = now
-                    // 推理帧独立拷贝
                     val inferBitmap = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
                     val imuNow = imuBuffer.lastOrNull() ?: ""
                     val gpsNow = lastLocationText
 
                     Thread {
+                        val inferStart = System.currentTimeMillis()
                         try {
                             val results = detector.detect(inferBitmap)
+                            val inferMs = System.currentTimeMillis() - inferStart
+
                             val filtered = results
                                 .filter { it.confidence > 0.35f }
                                 .groupBy { it.label }
@@ -256,17 +278,39 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                                 .take(3)
 
                             runOnUiThread {
+                                // 更新推理耗时
+                                tvInferMs.text = "推理: ${inferMs}ms"
+
                                 overlayView.detections  = filtered
-                                // 【修改】用最新帧尺寸，不是推理帧尺寸，避免框位置滞后
                                 overlayView.frameWidth  = latestFrameWidth
                                 overlayView.frameHeight = latestFrameHeight
                                 overlayView.invalidate()
+
+                                // 更新通道B状态和检测提示
+                                if (filtered.isNotEmpty()) {
+                                    val top = filtered.first()
+                                    val hint = "${top.label} ${"%.0f".format(top.confidence * 100)}%"
+                                    tvChannelB.text = "检测到: $hint"
+                                    tvChannelB.setTextColor(getColor(android.R.color.holo_orange_light))
+                                    // 3秒后自动隐藏提示
+                                    timerHandler.postDelayed({
+                                        tvChannelB.text = "视觉 监测中"
+                                        tvChannelB.setTextColor(getColor(android.R.color.holo_green_light))
+                                    }, 3000)
+                                } else {
+                                    tvChannelB.text = "视觉 监测中"
+                                    tvChannelB.setTextColor(getColor(android.R.color.holo_green_light))
+                                }
                             }
 
                             if (filtered.isNotEmpty() &&
                                 System.currentTimeMillis() - lastChannelBSaveMs > CHANNEL_B_COOLDOWN_MS) {
                                 lastChannelBSaveMs = System.currentTimeMillis()
                                 saveChannelBEvent(filtered, imuNow, gpsNow, inferBitmap)
+                                runOnUiThread {
+                                    sessionEventCount++
+                                    tvSessionCount.text = "本次: $sessionEventCount 次"
+                                }
                                 Log.d("YOLO_B", "通道B保存: ${filtered.map { "${it.label}(${"%.2f".format(it.confidence)})" }}")
                             }
                         } catch (e: Exception) {
@@ -321,13 +365,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         imuFileWriter?.write("AccX,AccY,AccZ,GyroX,GyroY,GyroZ\n")
                         currentFileGpsWriter = File(roadDir, "GPS_$ts.txt").bufferedWriter()
                         currentFileGpsWriter?.write("Latitude,Longitude\n")
-                        btnRecord.text = ""
-                        isRecording    = true
-                        btnRecord.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                            android.graphics.Color.parseColor("#FF3B30"))
+
+                        isRecording = true
+                        sessionEventCount = 0
+
+                        // 计时器启动
+                        recordingStartMs = System.currentTimeMillis()
+                        tvDuration.visibility = android.view.View.VISIBLE
+                        timerHandler.post(timerRunnable)
+
                         runOnUiThread {
-                            findViewById<TextView>(R.id.tvRecordDot).text = "● 录制中"
-                            findViewById<TextView>(R.id.tvRecordDot).setTextColor(getColor(android.R.color.holo_red_light))
+                            tvRecordDot.text = "● 录制中"
+                            tvRecordDot.setTextColor(getColor(android.R.color.holo_red_light))
+                            tvChannelA.text = "IMU 监听中"
+                            tvChannelA.setTextColor(getColor(android.R.color.holo_green_light))
+                            tvChannelB.text = "视觉 监测中"
+                            tvChannelB.setTextColor(getColor(android.R.color.holo_green_light))
+                            tvRecordHint.text = "点击停止采集"
+                            tvSessionCount.text = "本次: 0 次"
                         }
                     }
                     is VideoRecordEvent.Finalize -> {
@@ -339,19 +394,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         }
                         imuFileWriter        = null
                         currentFileGpsWriter = null
-                        btnRecord.text       = ""
                         isRecording          = false
-                        btnRecord.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                            android.graphics.Color.parseColor("#555555"))
+
+                        // 停止计时器
+                        timerHandler.removeCallbacks(timerRunnable)
 
                         runOnUiThread {
-                            findViewById<TextView>(R.id.tvRecordDot).text = "● 待机"
-                            findViewById<TextView>(R.id.tvRecordDot).setTextColor(android.graphics.Color.parseColor("#888888"))
+                            tvRecordDot.text = "● 待机"
+                            tvRecordDot.setTextColor(android.graphics.Color.parseColor("#888888"))
+                            tvDuration.visibility = android.view.View.GONE
+                            tvChannelA.text = "IMU 待机"
+                            tvChannelA.setTextColor(android.graphics.Color.parseColor("#555555"))
+                            tvChannelB.text = "视觉 待机"
+                            tvChannelB.setTextColor(android.graphics.Color.parseColor("#555555"))
+                            tvRecordHint.text = "点击开始采集"
+                            overlayView.detections = emptyList()
+                            overlayView.invalidate()
                         }
 
-
                         if (!recordEvent.hasError()) {
-                            Toast.makeText(baseContext, "视频与数据已统一保存", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(baseContext,
+                                "采集完成，共检测 $sessionEventCount 次病害事件", Toast.LENGTH_SHORT).show()
                         } else {
                             Log.e("VIDEO_ERROR", "录制出错: ${recordEvent.error}")
                         }
@@ -376,7 +439,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             imuSnapshot.forEach { out.write("$it\n") }
         }
 
-        // 【修改】只保存最近8帧而不是全部60帧，大幅减少IO时间
         val frames = synchronized(frameBuffer) {
             frameBuffer.takeLast(8).map { it.copy(it.config ?: Bitmap.Config.ARGB_8888, false) }
         }
@@ -406,36 +468,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     out.write("置信度: ${"%.2f".format(d.confidence)}\n")
                     out.write("位置框: [${d.boundingBox.left.toInt()},${d.boundingBox.top.toInt()}," +
                             "${d.boundingBox.right.toInt()},${d.boundingBox.bottom.toInt()}]\n")
-                    out.write("IMU融合数据(预留): ${imuSnapshot.lastOrNull() ?: "无"}\n")
                     out.write("---\n")
                 }
             }
         }
 
-        // ── 上传到服务器 ──────────────────────────────────────────
-        val parts = gpsSnapshot.split(",")
-        val lat = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
-        val lng = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
+        val parts  = gpsSnapshot.split(",")
+        val lat    = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
+        val lng    = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
         val topDet = detections.firstOrNull()
         if (topDet != null) {
-            val frames2 = eventDir.listFiles { f -> f.name.startsWith("frame_") }
-            val imageFile = frames2?.firstOrNull()
+            val imageFile = eventDir.listFiles { f -> f.name.startsWith("frame_") }?.firstOrNull()
             DetectionUploader.upload(
-                imageFile = imageFile,
-                latitude = lat,
-                longitude = lng,
+                imageFile  = imageFile,
+                latitude   = lat,
+                longitude  = lng,
                 defectType = topDet.label,
                 confidence = topDet.confidence,
-                bboxX1 = topDet.boundingBox.left / latestFrameWidth.toFloat(),
-                bboxY1 = topDet.boundingBox.top / latestFrameHeight.toFloat(),
-                bboxX2 = topDet.boundingBox.right / latestFrameWidth.toFloat(),
-                bboxY2 = topDet.boundingBox.bottom / latestFrameHeight.toFloat(),
-                channel = "A",
-                deviceId = deviceId,
-                onResult = { success, msg ->
-                    Log.d("Upload_A", "通道A上传: $success - $msg")
-                }
+                bboxX1     = topDet.boundingBox.left   / latestFrameWidth.toFloat(),
+                bboxY1     = topDet.boundingBox.top    / latestFrameHeight.toFloat(),
+                bboxX2     = topDet.boundingBox.right  / latestFrameWidth.toFloat(),
+                bboxY2     = topDet.boundingBox.bottom / latestFrameHeight.toFloat(),
+                channel    = "A",
+                deviceId   = deviceId,
+                onResult   = { success, msg -> Log.d("Upload_A", "通道A: $success - $msg") }
             )
+        }
+
+        runOnUiThread {
+            sessionEventCount++
+            tvSessionCount.text = "本次: $sessionEventCount 次"
         }
     }
 
@@ -476,28 +538,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        // ── 上传到服务器 ──────────────────────────────────────────
-        val parts = gpsData.split(",")
-        val lat = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
-        val lng = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
+        val parts  = gpsData.split(",")
+        val lat    = parts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 0.0
+        val lng    = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 0.0
         val topDet = detections.firstOrNull()
         if (topDet != null) {
-            val imageFile = File(eventDir, "frame_0.jpg")
             DetectionUploader.upload(
-                imageFile = imageFile,
-                latitude = lat,
-                longitude = lng,
+                imageFile  = File(eventDir, "frame_0.jpg"),
+                latitude   = lat,
+                longitude  = lng,
                 defectType = topDet.label,
                 confidence = topDet.confidence,
-                bboxX1 = topDet.boundingBox.left / frame.width,
-                bboxY1 = topDet.boundingBox.top / frame.height,
-                bboxX2 = topDet.boundingBox.right / frame.width,
-                bboxY2 = topDet.boundingBox.bottom / frame.height,
-                channel = "B",
-                deviceId = deviceId,
-                onResult = { success, msg ->
-                    Log.d("Upload_B", "通道B上传: $success - $msg")
-                }
+                bboxX1     = topDet.boundingBox.left   / frame.width,
+                bboxY1     = topDet.boundingBox.top    / frame.height,
+                bboxX2     = topDet.boundingBox.right  / frame.width,
+                bboxY2     = topDet.boundingBox.bottom / frame.height,
+                channel    = "B",
+                deviceId   = deviceId,
+                onResult   = { success, msg -> Log.d("Upload_B", "通道B: $success - $msg") }
             )
         }
     }
@@ -525,48 +583,68 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             val accTal = abs(currentAcc[1] - 9.8f) + abs(currentAcc[2])
-            tvAccTal.text = String.format("实时 acc_tal: %.2f", accTal)
 
-            if (accTal > threshold) {
-                tvAccTal.setTextColor(getColor(android.R.color.holo_red_dark))
+            runOnUiThread {
+                tvAccTal.text = "acc_tal: ${"%.2f".format(accTal)} m/s²"
 
-                // ── 通道A：IMU颠簸触发 ────────────────────────────────────
-                if (isRecording) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastTriggerTime > COOL_DOWN_MS
-                        && isDetecting.compareAndSet(false, true)) {
-                        lastTriggerTime = now
-                        val frames = synchronized(frameBuffer) {
-                            frameBuffer.map { it.copy(it.config ?: Bitmap.Config.ARGB_8888, false) }
-                        }
-                        val imuSnapshot = imuBuffer.toList()
-                        val gpsSnapshot = lastLocationText
-
-                        Thread {
-                            try {
-                                val step = maxOf(1, frames.size / 8)
-                                val sampled = frames.filterIndexed { i, _ -> i % step == 0 }
-                                val allDetect = sampled.flatMap { bmp ->
-                                    try { detector.detect(bmp) } catch (e: Exception) { emptyList() }
-                                }
-                                val best = allDetect
-                                    .groupBy { it.label }
-                                    .map { (_, list) -> list.maxByOrNull { it.confidence }!! }
-                                    .sortedByDescending { it.confidence }
-                                    .take(5)
-                                saveEventData(best, imuSnapshot, gpsSnapshot)
-                                Log.d("YOLO_A", "通道A完成，检测到 ${best.size} 个病害")
-                            } catch (e: Exception) {
-                                Log.e("YOLO_A", "通道A异常: ${e.message}")
-                                saveEventData(emptyList(), imuSnapshot, gpsSnapshot)
-                            } finally {
-                                isDetecting.set(false)
-                            }
-                        }.start()
-                    }
+                if (accTal > threshold) {
+                    tvAccTal.setTextColor(android.graphics.Color.parseColor("#FF4444"))
+                    tvImuState.text = "⚠ 颠簸触发"
+                    tvImuState.setTextColor(android.graphics.Color.parseColor("#FF4444"))
+                } else {
+                    tvAccTal.setTextColor(android.graphics.Color.WHITE)
+                    tvImuState.text = "IMU 正常"
+                    tvImuState.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
                 }
-            } else {
-                tvAccTal.setTextColor(getColor(android.R.color.white))
+            }
+
+            // ── 通道A：IMU颠簸触发 ────────────────────────────────────────
+            if (accTal > threshold && isRecording) {
+                val now = System.currentTimeMillis()
+                if (now - lastTriggerTime > COOL_DOWN_MS
+                    && isDetecting.compareAndSet(false, true)) {
+                    lastTriggerTime = now
+
+                    runOnUiThread {
+                        tvChannelA.text = "IMU 已触发"
+                        tvChannelA.setTextColor(getColor(android.R.color.holo_red_light))
+                        // 3秒冷却后恢复
+                        timerHandler.postDelayed({
+                            if (isRecording) {
+                                tvChannelA.text = "IMU 监听中"
+                                tvChannelA.setTextColor(getColor(android.R.color.holo_green_light))
+                            }
+                        }, COOL_DOWN_MS)
+                    }
+
+                    val frames      = synchronized(frameBuffer) {
+                        frameBuffer.map { it.copy(it.config ?: Bitmap.Config.ARGB_8888, false) }
+                    }
+                    val imuSnapshot = imuBuffer.toList()
+                    val gpsSnapshot = lastLocationText
+
+                    Thread {
+                        try {
+                            val step    = maxOf(1, frames.size / 8)
+                            val sampled = frames.filterIndexed { i, _ -> i % step == 0 }
+                            val allDetect = sampled.flatMap { bmp ->
+                                try { detector.detect(bmp) } catch (e: Exception) { emptyList() }
+                            }
+                            val best = allDetect
+                                .groupBy { it.label }
+                                .map { (_, list) -> list.maxByOrNull { it.confidence }!! }
+                                .sortedByDescending { it.confidence }
+                                .take(5)
+                            saveEventData(best, imuSnapshot, gpsSnapshot)
+                            Log.d("YOLO_A", "通道A完成，检测到 ${best.size} 个病害")
+                        } catch (e: Exception) {
+                            Log.e("YOLO_A", "通道A异常: ${e.message}")
+                            saveEventData(emptyList(), imuSnapshot, gpsSnapshot)
+                        } finally {
+                            isDetecting.set(false)
+                        }
+                    }.start()
+                }
             }
         }
 
@@ -582,36 +660,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // ══════════════════════════════════════════════════════════════════════════
     // 工具函数
     // ══════════════════════════════════════════════════════════════════════════
-    /**
-     * 将 ImageProxy 转为正确方向的 Bitmap。
-     *
-     * 关键修复：逐行拷贝 Y/U/V plane，跳过行间 padding，
-     * 避免 buffer.remaining() 包含 padding 字节导致图像损坏。
-     * 旋转固定 90°（Redmi K30 后置竖屏）。
-     */
     private fun ImageProxy.toRotatedBitmap(): Bitmap {
-        val yPlane = planes[0]
-        val uPlane = planes[1]
-        val vPlane = planes[2]
-
-        val yRowStride    = yPlane.rowStride
-        val uvRowStride   = uPlane.rowStride
-        val uvPixelStride = uPlane.pixelStride  // 通常为 2（interleaved）
-
-        val w = width
-        val h = height
+        val yPlane = planes[0]; val uPlane = planes[1]; val vPlane = planes[2]
+        val yRowStride = yPlane.rowStride
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+        val w = width; val h = height
         val nv21 = ByteArray(w * h * 3 / 2)
-
-        // 逐行拷贝 Y plane，跳过行尾 padding
         val yBuf = yPlane.buffer
         for (row in 0 until h) {
             yBuf.position(row * yRowStride)
             yBuf.get(nv21, row * w, w)
         }
-
-        // 逐像素拷贝 UV plane（NV21：V在前U在后，交错排列）
-        val vBuf = vPlane.buffer
-        val uBuf = uPlane.buffer
+        val vBuf = vPlane.buffer; val uBuf = uPlane.buffer
         var uvIndex = w * h
         for (row in 0 until h / 2) {
             for (col in 0 until w / 2) {
@@ -620,13 +681,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 nv21[uvIndex++] = uBuf.get(pos)
             }
         }
-
         val yuv = YuvImage(nv21, ImageFormat.NV21, w, h, null)
         val out = ByteArrayOutputStream()
         yuv.compressToJpeg(Rect(0, 0, w, h), 95, out)
         val decoded = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
-
-        // 旋转 90°，旋转后宽高互换（原 w×h → 旋转后 h×w）
         val matrix = Matrix().apply { postRotate(90f) }
         return Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
     }
@@ -644,8 +702,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 10 && allPermissionsGranted()) {
-            startCamera()
-            startLocationUpdates()
+            startCamera(); startLocationUpdates()
         }
     }
 
@@ -655,16 +712,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         threshold        = prefs.getFloat("threshold", 3.0f)
         imuFrequencyHz   = prefs.getInt("frequency", 50)
         sampleIntervalMs = 1000L / imuFrequencyHz
-
         val newFps = prefs.getInt("video_fps", 30)
-        if (newFps != videoFps) {
-            videoFps = newFps
-            startCamera()
-        }
-
+        if (newFps != videoFps) { videoFps = newFps; startCamera() }
         findViewById<TextView>(R.id.tvConfig).text =
             "阈值: $threshold m/s² | 采样率: ${imuFrequencyHz}Hz"
-
         accelSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
         gyroSensor?.let  { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
     }
@@ -672,11 +723,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onPause() {
         super.onPause()
         sensorManager.unregisterListener(this)
+        timerHandler.removeCallbacks(timerRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         detector.close()
+        timerHandler.removeCallbacksAndMessages(null)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

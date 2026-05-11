@@ -46,6 +46,75 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <!-- 筛选栏 -->
+    <LinearLayout
+        android:id="@+id/filterBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#111111"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
+
+        <!-- 日期筛选按钮 -->
+        <TextView
+            android:id="@+id/btnFilterDate"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="#1E1E1E"
+            android:gravity="center"
+            android:text="📅 全部日期"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
+
+        <!-- 类别筛选按钮 -->
+        <TextView
+            android:id="@+id/btnFilterType"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="#1E1E1E"
+            android:gravity="center"
+            android:text="🔍 全部类别"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
+
+        <!-- 通道筛选按钮 -->
+        <TextView
+            android:id="@+id/btnFilterChannel"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="#1E1E1E"
+            android:gravity="center"
+            android:text="⚡ 全部通道"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <!-- 筛选结果提示 -->
+    <TextView
+        android:id="@+id/tvFilterHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:text=""
+        android:textColor="#666666"
+        android:textSize="11sp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/filterBar" />
+
     <!-- 空状态 -->
     <LinearLayout
         android:id="@+id/emptyView"
@@ -55,7 +124,7 @@
         android:orientation="vertical"
         android:visibility="gone"
         android:padding="48dp"
-        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintTop_toBottomOf="@id/filterBar"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
@@ -80,10 +149,10 @@
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:paddingTop="8dp"
+        android:paddingTop="4dp"
         android:paddingBottom="8dp"
         android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintTop_toBottomOf="@id/tvFilterHint"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

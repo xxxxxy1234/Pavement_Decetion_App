@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 object AuthApiClient {
 
     // ⚠️ 替换为实际服务端地址
-    private const val BASE_URL = "http://172.20.10.11:8080"
+    private const val BASE_URL = "http://192.168.5.77:8080"
 
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
